@@ -20,13 +20,14 @@ def grab():
         os.remove(artifact_path)
         assert (init_file in os.listdir(challenge_root))
         os.chmod(os.path.join(challenge_root, init_file), 0o755)
+        outlog = open(os.path.join(challenge_root, "out.log"), "w")
         errlog = open(os.path.join(challenge_root, "err.log"), "w")
         subprocess.Popen(
-            ["nohup", os.path.join(challenge_root, init_file), ">", "chall.out"],
+            [os.path.join(challenge_root, init_file)],
             cwd=challenge_root,
-            stdout=errlog,
-            stderr=subprocess.STDOUT,
-            start_new_session=True
+            stdout=outlog,
+            stderr=errlog,
+            shell=True
         )
         return {"success": True}
     except Exception as err:
