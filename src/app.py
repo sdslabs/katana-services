@@ -25,7 +25,7 @@ def grab():
             [os.path.join(challenge_root, os.environ['INIT_FILE'])],
             cwd=challenge_root,
             stdout=outlog,
-            stderr=errlog`
+            stderr=errlog,
         )
         return {"success": True}
     except Exception as err:
