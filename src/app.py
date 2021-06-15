@@ -32,5 +32,5 @@ def grab():
         return {"success": False, "error": str(err)}
 
 # TODO: add metrics/monitoring functionality
-
-app.run('0.0.0.0', os.environ['DAEMON_PORT'])
+if __name__ == "__main__":
+    app.run('0.0.0.0', os.environ['DAEMON_PORT'])
