@@ -2,6 +2,8 @@ from flask import Flask, request
 import os
 import zipfile
 import subprocess
+import pyinotify
+import threading
 
 app = Flask(__name__)
 
@@ -31,6 +33,23 @@ def grab():
     except Exception as err:
         return {"success": False, "error": str(err)}
 
+class EventHandler(pyinotify.ProcessEvent):
+    def process_IN_MODIFY(self, event):
+        filepath = event.pathname
+        folder = filepath[:-7]
+	    cmd="./script.sh "+folder+" "+file_name
+        os.system(cmd)
+        
+def start_notifier():
+    wm = pyinotify.WatchManager()
+    mask = pyinotify.IN_MODIFY
+    handler = EventHandler()
+    notifier = pyinotify.Notifier(wm, handler)
+    wdd = wm.add_watch('/opt/katana', mask, rec=True)
+    notifier.loop()
+
 # TODO: add metrics/monitoring functionality
 if __name__ == "__main__":
     app.run('0.0.0.0', os.environ['DAEMON_PORT'])
+    t = threading.Thread(target=start_notifier)
+    t.start()
