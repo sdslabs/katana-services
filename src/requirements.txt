@@ -2,4 +2,4 @@ flask
 pytest
 requests
 pyinotify
-threading
+thread6
