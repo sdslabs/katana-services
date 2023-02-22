@@ -37,12 +37,12 @@ class EventHandler(pyinotify.ProcessEvent):
     def process_IN_MODIFY(self, event):
         filepath = event.pathname
         folder = filepath[:-7]
-        cmd="./script.sh "+folder+" "+filepath
+        cmd="./script.sh "+folder
         os.system(cmd)
         
 def start_notifier():
     wm = pyinotify.WatchManager()
-    mask = pyinotify.IN_MODIFY
+    mask = pyinotify.IN_MOVED_FROM	  
     handler = EventHandler()
     notifier = pyinotify.Notifier(wm, handler)
     wdd = wm.add_watch('/opt/katana', mask, rec=True)

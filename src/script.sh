@@ -1,12 +1,12 @@
 #!/bin/bash
-tar -xf $1 -C challenge
+tar -xf "${1}.tar.gz" -C challenge
 cd challenge
-result= 'ls'
-cd $result
 eval "$(ssh-agent -s)"
 ssh-add /tmp/ssh
 ssh -o StrictHostKeyChecking=no git@github.com
-git init /opt/katana/challenge/$result
-git --git-dir /opt/katana/challenge/$result/.git remote add origin git@github.com:Perseus-Jackson477/notekeeper.git
-git config --global --add safe.directory /opt/katana/challenge/$result
+echo "${1}/"
+cd "${1}/"
+git init 
+git config --global --add safe.directory "/opt/katana/challenge/${1}"
+git remote add origin git@github.com:Perseus-Jackson477/notekeeper.git
 git pull origin main --allow-unrelated-histories
