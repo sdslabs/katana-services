@@ -34,18 +34,18 @@ def grab():
         return {"success": False, "error": str(err)}
     
 class EventHandler(pyinotify.ProcessEvent):
-    def process_IN_CREATE(self, event):
+    def process_IN_MODIFY(self, event):
         filepath = event.pathname
-        folder = filepath[:-7]
+        folder = filepath[12:-7]
         cmd="./script.sh "+folder
         os.system(cmd)
         
 def start_notifier():
     wm = pyinotify.WatchManager()
-    mask = pyinotify.IN_CREATE
+    mask = pyinotify.IN_MODIFY
     handler = EventHandler()
     notifier = pyinotify.Notifier(wm, handler)
-    wdd = wm.add_watch('/opt/katana', mask, rec=True)
+    wdd = wm.add_watch('/opt/katana/', mask, rec=False)
     notifier.loop()
 
 # TODO: add metrics/monitoring functionality
