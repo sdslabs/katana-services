@@ -34,7 +34,7 @@ def grab():
         return {"success": False, "error": str(err)}
     
 class EventHandler(pyinotify.ProcessEvent):
-    def process_IN_MODIFY(self, event):
+    def process_IN_CREATE(self, event):
         filepath = event.pathname
         folder = filepath[:-7]
         cmd="./script.sh "+folder
@@ -42,7 +42,7 @@ class EventHandler(pyinotify.ProcessEvent):
         
 def start_notifier():
     wm = pyinotify.WatchManager()
-    mask = pyinotify.IN_MOVED_FROM	  
+    mask = pyinotify.IN_CREATE
     handler = EventHandler()
     notifier = pyinotify.Notifier(wm, handler)
     wdd = wm.add_watch('/opt/katana', mask, rec=True)
