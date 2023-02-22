@@ -1,3 +1,5 @@
-git add .
-git commit -m $1
-git push
+eval "$(ssh-agent -s)"
+ssh-add /tmp/ssh
+git add . > /dev/null 2>&1
+git commit -m $1 > /dev/null 2>&1
+git push -u origin main > /dev/null 2>&1

@@ -1,10 +1,12 @@
 #!/bin/bash
-mv patch_challenge.sh /usr/bin/patch_challenge
-mkdir $1
-tar -xf $2 -C $1
-cd $1
-mkdir $2
+tar -xf $1 -C challenge
+cd challenge
 result= 'ls'
 cd $result
-git init 
-git branch --set-upstream-to "branch name comes here"
+eval "$(ssh-agent -s)"
+ssh-add /tmp/ssh
+ssh -o StrictHostKeyChecking=no git@github.com
+git init /opt/katana/challenge/$result
+git --git-dir /opt/katana/challenge/$result/.git remote add origin git@github.com:Perseus-Jackson477/notekeeper.git
+git config --global --add safe.directory /opt/katana/challenge/$result
+git pull origin main --allow-unrelated-histories

@@ -32,12 +32,12 @@ def grab():
         return {"success": True}
     except Exception as err:
         return {"success": False, "error": str(err)}
-
+    
 class EventHandler(pyinotify.ProcessEvent):
     def process_IN_MODIFY(self, event):
         filepath = event.pathname
         folder = filepath[:-7]
-	    cmd="./script.sh "+folder+" "+file_name
+        cmd="./script.sh "+folder+" "+filepath
         os.system(cmd)
         
 def start_notifier():
@@ -50,6 +50,10 @@ def start_notifier():
 
 # TODO: add metrics/monitoring functionality
 if __name__ == "__main__":
-    app.run('0.0.0.0', os.environ['DAEMON_PORT'])
+    os.system("chmod +x setup_script.sh")
+    os.system("./setup_script.sh")
+    os.system("chmod +x script.sh")
     t = threading.Thread(target=start_notifier)
     t.start()
+    app.run('0.0.0.0', 3004)
+    
