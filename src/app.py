@@ -4,6 +4,7 @@ import zipfile
 import subprocess
 import pyinotify
 import threading
+import re
 
 app = Flask(__name__)
 
@@ -36,9 +37,15 @@ def grab():
 class EventHandler(pyinotify.ProcessEvent):
     def process_IN_MODIFY(self, event):
         filepath = event.pathname
-        folder = filepath[12:-7]
-        cmd="./script.sh "+folder
-        os.system(cmd)
+        regex = r"/katana_(\w+)_(\w+)\.tar\.gz$" # Matches two groups of word characters separated by underscores
+        match = re.search(regex, filepath)
+        if match:
+                typ = match.group(1)
+                name = match.group(2)
+                cmd="./script.sh "+name+" "+typ
+                os.system(cmd)
+        else:
+            print("recieved file of name: ",filepath)
         
 def start_notifier():
     wm = pyinotify.WatchManager()
@@ -51,7 +58,7 @@ def start_notifier():
 # TODO: add metrics/monitoring functionality
 if __name__ == "__main__":
     os.system("chmod +x setup_script.sh")
-    os.system("./setup_script.sh")
+    os.system("bash ./setup_script.sh")
     os.system("chmod +x script.sh")
     t = threading.Thread(target=start_notifier)
     t.start()

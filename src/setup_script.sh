@@ -1,4 +1,10 @@
 mkdir challenge
+cd challenge
+typ=("web" "pwn")
+for item in "${typ[@]}"
+do
+	mkdir "$item"
+done
 apt upgrade
 apt-get update -y
 apt install ssh -y -y -y
