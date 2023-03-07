@@ -10,5 +10,5 @@ apt-get update -y
 apt install git -y
 mv /opt/katana/patch_challenge.sh /usr/bin/patch_challenge
 chmod +x /usr/bin/patch_challenge
-git config --global user.email "vanshuppal2002@gmail.com"
-git config --global user.name "Perseus-Jackson477"
+git config --global user.email $HOSTNAME\@katana.com
+git config --global user.name $HOSTNAME
