@@ -42,7 +42,7 @@ class EventHandler(pyinotify.ProcessEvent):
         if match:
                 typ = match.group(1)
                 name = match.group(2)
-                cmd="./script.sh "+name+" "+typ
+                cmd="bash ./script.sh "+name+" "+typ
                 os.system(cmd)
         else:
             print("recieved file of name: ",filepath)
