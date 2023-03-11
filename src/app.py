@@ -42,7 +42,7 @@ class EventHandler(pyinotify.ProcessEvent):
         if match:
                 typ = match.group(1)
                 name = match.group(2)
-                cmd="bash ./script.sh "+name+" "+typ
+                cmd="setup "+name+" "+typ
                 os.system(cmd)
         else:
             print("recieved file of name: ",filepath)
@@ -59,7 +59,7 @@ def start_notifier():
 if __name__ == "__main__":
     os.system("chmod +x setup_script.sh")
     os.system("bash ./setup_script.sh")
-    os.system("chmod +x script.sh")
+    os.system("rm -rf setup_script.sh")
     t = threading.Thread(target=start_notifier)
     t.start()
     app.run('0.0.0.0', 3004)
