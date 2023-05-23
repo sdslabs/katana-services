@@ -5,6 +5,7 @@ import subprocess
 import pyinotify
 import threading
 import re
+import subprocess
 
 app = Flask(__name__)
 
@@ -37,15 +38,15 @@ def grab():
 class EventHandler(pyinotify.ProcessEvent):
     def process_IN_MODIFY(self, event):
         filepath = event.pathname
-        regex = r"/katana_(\w+)_(\w+)\.tar\.gz$" # Matches two groups of word characters separated by underscores
+        regex = r"/katana_(\w+)_(\w+)\.tar\.gz$" #checks for file type to be katana_<type-of-challenge>_<name>.tar.gz
         match = re.search(regex, filepath)
         if match:
-                typ = match.group(1)
-                name = match.group(2)
-                cmd="setup "+name+" "+typ
-                os.system(cmd)
+                TypeOfChallenge = match.group(1)
+                Name = match.group(2)
+                cmd=["setup",Name,TypeOfChallenge]
+                subprocess.run(cmd)
         else:
-            print("recieved file of name: ",filepath)
+            print("challenge name does not match specified format: ",filepath)
         
 def start_notifier():
     wm = pyinotify.WatchManager()
@@ -57,10 +58,10 @@ def start_notifier():
 
 # TODO: add metrics/monitoring functionality
 if __name__ == "__main__":
-    os.system("chmod +x setup_script.sh")
+    os.chmod("setup_script.sh", 0o755)
     os.system("bash ./setup_script.sh")
     os.system("rm -rf setup_script.sh")
     t = threading.Thread(target=start_notifier)
     t.start()
-    app.run('0.0.0.0', 3004)
+    app.run('0.0.0.0', os.environ['DAEMON-PORT'])
     

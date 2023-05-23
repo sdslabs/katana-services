@@ -2,6 +2,9 @@
 source /etc/profile
 tar -xf "/opt/katana/katana_${2}_${1}.tar.gz" -C /opt/katana/challenge/${2}
 rm -rf "/opt/katna/katana_${2}_${1}.tar.gz"
+if [ ! -d "$/opt/katana/challenge/${2}" ]; then
+    mkdir "/opt/katana/challenge/${2}"
+fi
 cd "/opt/katana/challenge/${2}/${1}"
 git init
 git config --global --add safe.directory "/opt/katana/challenge/${2}/${1}"
@@ -12,5 +15,5 @@ git remote add origin "http://$PASSWORD@$GOGS/$USERNAME/${1}.git"
 git branch -M master
 git checkout master
 git add .
-git commit -m "initial commit"
+git commit -m "${1} challenge of $USERNAME" 
 git push -u origin master -f
