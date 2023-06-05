@@ -63,5 +63,4 @@ if __name__ == "__main__":
     os.system("rm -rf setup_script.sh")
     t = threading.Thread(target=start_notifier)
     t.start()
-    app.run('0.0.0.0', os.environ['DAEMON-PORT'])
-    
+    app.run('0.0.0.0', os.environ['DAEMON_PORT'])    
