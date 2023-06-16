@@ -46,14 +46,14 @@ class EventHandler(pyinotify.ProcessEvent):
                 cmd=["setup",Name,TypeOfChallenge]
                 subprocess.run(cmd)
         else:
-            print("challenge name does not match specified format: ",filepath)
+            print("Challenge name does not match specified format: ",filepath)
         
 def start_notifier():
     wm = pyinotify.WatchManager()
     mask = pyinotify.IN_MODIFY
     handler = EventHandler()
     notifier = pyinotify.Notifier(wm, handler)
-    wdd = wm.add_watch('/opt/katana/', mask, rec=False)
+    wdd = wm.add_watch(os.environ["ROOT_DIRECTORY"]+"/", mask, rec=False)
     notifier.loop()
 
 # TODO: add metrics/monitoring functionality
