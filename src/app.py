@@ -2,6 +2,10 @@ from flask import Flask, request
 import os
 import zipfile
 import subprocess
+import pyinotify
+import threading
+import re
+import subprocess
 
 app = Flask(__name__)
 
@@ -30,7 +34,33 @@ def grab():
         return {"success": True}
     except Exception as err:
         return {"success": False, "error": str(err)}
+    
+class EventHandler(pyinotify.ProcessEvent):
+    def process_IN_MODIFY(self, event):
+        filepath = event.pathname
+        regex = r"/katana_(\w+)_(\w+)\.tar\.gz$" #checks for file type to be katana_<type-of-challenge>_<name>.tar.gz
+        match = re.search(regex, filepath)
+        if match:
+                TypeOfChallenge = match.group(1)
+                Name = match.group(2)
+                cmd=["setup",Name,TypeOfChallenge]
+                subprocess.run(cmd)
+        else:
+            print("Challenge name does not match specified format: ",filepath)
+        
+def start_notifier():
+    wm = pyinotify.WatchManager()
+    mask = pyinotify.IN_MODIFY
+    handler = EventHandler()
+    notifier = pyinotify.Notifier(wm, handler)
+    wdd = wm.add_watch(os.environ["ROOT_DIRECTORY"]+"/", mask, rec=False)
+    notifier.loop()
 
 # TODO: add metrics/monitoring functionality
 if __name__ == "__main__":
-    app.run('0.0.0.0', os.environ['DAEMON_PORT'])
+    os.chmod("setup_script.sh", 0o755)
+    os.system("bash ./setup_script.sh")
+    os.system("rm -rf setup_script.sh")
+    t = threading.Thread(target=start_notifier)
+    t.start()
+    app.run('0.0.0.0', os.environ['DAEMON_PORT'])    
