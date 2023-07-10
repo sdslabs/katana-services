@@ -1,1 +1,10 @@
-Tsuka/.gitignore
+Tsuka/src/__pycache__
+Tsuka/.pytest_cache
+
+Kashira/src/__pycache__
+Kashira/.pytest_cache
+
+recursive-exclude * *.py[co]
+
+# Exclude the tests
+recursive-exclude tests *
