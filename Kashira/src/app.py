@@ -4,6 +4,8 @@ from kubernetes.stream import stream
 from pymongo import MongoClient
 import random
 import threading
+import os
+import time
 
 app = Flask(__name__)
 flag_chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_'
@@ -49,13 +51,12 @@ def update_flag(mongo_client, team_name, challenge_name):
 def watch_statefulset():
     namespace = 'katana'
     statefulset_name = 'kashira'
-
     w = watch.Watch()
     for event in w.stream(api_instance.list_namespaced_stateful_set, namespace=namespace):
         if event['object'].metadata.name == statefulset_name:
             annotations = event['object'].metadata.annotations
             if annotations and annotations.get('tick') == 'true':
-                update_flag(mongo,"katana-team-0","notekeeper")
+                update_all_challenges()
                 annotations['tick'] = 'false'  # Set annotation to 'false'
                 statefulset = api_instance.read_namespaced_stateful_set(statefulset_name, namespace)
                 statefulset.metadata.annotations = annotations
@@ -66,7 +67,56 @@ def run_watch_statefulset():
         watch_statefulset()
 
 
+def pod_executor(command, pod_name, pod_namespace):
+    resp = api.read_namespaced_pod(name=pod_name, namespace=pod_namespace)
+    exec_command = [
+        '/bin/sh',
+        '-c',
+        ' '.join(command)]
+    resp = stream(api.connect_get_namespaced_pod_exec,
+                  pod_name,
+                  pod_namespace,
+                  command=exec_command,
+                  stderr=True, stdin=False,
+                  stdout=True, tty=False)
+    return resp
+
+def update_all_challenges():
+    mongo_db = mongo['katana']
+    mongo_collection = mongo_db['teams']
+    for team in mongo_collection.find():
+        for challenge in team['challenges']:
+            update_flag(mongo, team['username'], challenge['challengename'])
+            challenge_name = challenge['challengename']
+            checker_path = f"updaters/{challenge_name}/checker.sh"
+            if os.path.exists(checker_path):
+                command = ["sh", checker_path]
+                flag = pod_executor(command, team['podname'], team["username"]+"-ns")
+                print(flag)
+
+def flag_checker():
+    mongo_db = mongo['katana']
+    mongo_collection = mongo_db['teams']
+    for team in mongo_collection.find():
+        for challenge in team['challenges']:
+            challenge_name = challenge['challengename']
+            checker_path = f"checkers/{challenge_name}/checker.sh"
+            if os.path.exists(checker_path):
+                command = ["sh", checker_path]
+                flag = pod_executor(command, team['podname'], team["username"]+"-ns")
+                if(flag == challenge['flag']):
+                    print("Flag is correct")
+                else:
+                    print("Flag is incorrect")
+                    
+def run_commands_randomly():
+    while True:
+        flag_checker()
+        time.sleep(random.randint(0, 600))
+
 if __name__ == '__main__':
-    t = threading.Thread(target=run_watch_statefulset)
-    t.start()
+    t1 = threading.Thread(target=run_watch_statefulset)
+    t2 = threading.Thread(target=run_commands_randomly)
+    t1.start()
+    t2.start()
     app.run()
