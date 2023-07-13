@@ -67,12 +67,14 @@ def run_watch_statefulset():
         watch_statefulset()
 
 
-def pod_executor(command, pod_name, pod_namespace):
+def pod_executor(file_path, pod_name, pod_namespace):
+    with open(file_path, 'r') as file:
+        command = file.read()
     resp = api.read_namespaced_pod(name=pod_name, namespace=pod_namespace)
     exec_command = [
-        '/bin/sh',
+        'sh',
         '-c',
-        ' '.join(command)]
+        command]
     resp = stream(api.connect_get_namespaced_pod_exec,
                   pod_name,
                   pod_namespace,
@@ -88,7 +90,7 @@ def update_all_challenges():
         for challenge in team['challenges']:
             update_flag(mongo, team['username'], challenge['challengename'])
             challenge_name = challenge['challengename']
-            checker_path = f"updaters/{challenge_name}/checker.sh"
+            checker_path = f"updaters/{challenge_name}/flag_updater.sh"
             if os.path.exists(checker_path):
                 command = ["sh", checker_path]
                 flag = pod_executor(command, team['podname'], team["username"]+"-ns")
@@ -105,10 +107,12 @@ def flag_checker():
                 command = ["sh", checker_path]
                 flag = pod_executor(command, team['podname'], team["username"]+"-ns")
                 if(flag == challenge['flag']):
+                    print(flag)
                     print("Flag is correct")
                 else:
+                    print(flag)
                     print("Flag is incorrect")
-                    
+
 def run_commands_randomly():
     while True:
         flag_checker()
