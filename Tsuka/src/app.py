@@ -53,7 +53,7 @@ def start_notifier():
     mask = pyinotify.IN_MODIFY
     handler = EventHandler()
     notifier = pyinotify.Notifier(wm, handler)
-    wdd = wm.add_watch(os.environ["ROOT_DIRECTORY"]+"/", mask, rec=False)
+    wdd = wm.add_watch("/opt/katana/", mask, rec=False)
     notifier.loop()
 
 # TODO: add metrics/monitoring functionality
@@ -61,6 +61,7 @@ if __name__ == "__main__":
     os.chmod("setup_script.sh", 0o755)
     os.system("bash ./setup_script.sh")
     os.system("rm -rf setup_script.sh")
+    
     t = threading.Thread(target=start_notifier)
     t.start()
     app.run('0.0.0.0', os.environ['DAEMON_PORT'])    
