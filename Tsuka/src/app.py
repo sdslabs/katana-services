@@ -6,6 +6,7 @@ import pyinotify
 import threading
 import re
 import subprocess
+import paramiko
 
 app = Flask(__name__)
 
@@ -47,6 +48,15 @@ class EventHandler(pyinotify.ProcessEvent):
                 subprocess.run(cmd)
         else:
             print("Challenge name does not match specified format: ",filepath)
+
+class SSHServer(paramiko.ServerInterface):
+    def check_auth_password(self, username, password):
+        # In this simple example, we allow authentication with any username and password
+        return paramiko.AUTH_SUCCESSFUL
+
+    def check_channel_request(self, kind, chanid):
+        # We allow all channel requests
+        return paramiko.OPEN_SUCCEEDED
         
 def start_notifier():
     wm = pyinotify.WatchManager()
@@ -56,6 +66,20 @@ def start_notifier():
     wdd = wm.add_watch(os.environ["ROOT_DIRECTORY"]+"/", mask, rec=False)
     notifier.loop()
 
+def start_ssh_server():
+    server = paramiko.Transport(('0.0.0.0', 22))
+    server.add_server_key(paramiko.RSAKey.generate(2048))
+    server.set_subsystem_handler('sftp', paramiko.SFTPServer)
+
+    try:
+        server.start_server(server=SSHServer())
+        print("SSH server is running...")
+        server.accept()
+    except Exception as e:
+        print("An error occurred:", str(e))
+    finally:
+        server.close()
+
 # TODO: add metrics/monitoring functionality
 if __name__ == "__main__":
     os.chmod("setup_script.sh", 0o755)
@@ -63,4 +87,7 @@ if __name__ == "__main__":
     os.system("rm -rf setup_script.sh")
     t = threading.Thread(target=start_notifier)
     t.start()
+    # Start the SSH server in a separate thread
+    ssh_thread = threading.Thread(target=ssh_server_thread)
+    ssh_thread.start()
     app.run('0.0.0.0', os.environ['DAEMON_PORT'])    
