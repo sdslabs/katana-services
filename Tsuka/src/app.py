@@ -49,6 +49,15 @@ class EventHandler(pyinotify.ProcessEvent):
         else:
             print("Challenge name does not match specified format: ",filepath)
 
+        
+def start_notifier():
+    wm = pyinotify.WatchManager()
+    mask = pyinotify.IN_MODIFY
+    handler = EventHandler()
+    notifier = pyinotify.Notifier(wm, handler)
+    wdd = wm.add_watch("/opt/katana/", mask, rec=False)
+    notifier.loop()
+
 class SSHServer(paramiko.ServerInterface):
     def check_auth_password(self, username, password):
         # In this simple example, we allow authentication with any username and password
@@ -58,14 +67,6 @@ class SSHServer(paramiko.ServerInterface):
         # We allow all channel requests
         return paramiko.OPEN_SUCCEEDED
         
-def start_notifier():
-    wm = pyinotify.WatchManager()
-    mask = pyinotify.IN_MODIFY
-    handler = EventHandler()
-    notifier = pyinotify.Notifier(wm, handler)
-    wdd = wm.add_watch(os.environ["ROOT_DIRECTORY"]+"/", mask, rec=False)
-    notifier.loop()
-
 def start_ssh_server():
     server = paramiko.Transport(('0.0.0.0', 22))
     server.add_server_key(paramiko.RSAKey.generate(2048))
@@ -82,12 +83,12 @@ def start_ssh_server():
 
 # TODO: add metrics/monitoring functionality
 if __name__ == "__main__":
-    os.chmod("setup_script.sh", 0o755)
-    os.system("bash ./setup_script.sh")
-    os.system("rm -rf setup_script.sh")
+    os.chmod("setup-script.sh", 0o755)
+    os.system("bash ./setup-script.sh")
+    os.system("rm -rf setup-script.sh")
     t = threading.Thread(target=start_notifier)
     t.start()
     # Start the SSH server in a separate thread
-    ssh_thread = threading.Thread(target=ssh_server_thread)
+    ssh_thread = threading.Thread(target=start_ssh_server)
     ssh_thread.start()
     app.run('0.0.0.0', os.environ['DAEMON_PORT'])    
