@@ -4,6 +4,7 @@ apt upgrade
 apt-get update -y
 apt install git curl nano vim -y
 DEBIAN_FRONTEND=noninteractive apt -y install openssh-server
+echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config
 service ssh start
 mv /opt/katana/patch-challenge.sh /usr/bin/patch-challenge
 mv /opt/katana/setup.sh /usr/bin/setup
