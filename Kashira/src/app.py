@@ -1,6 +1,9 @@
 import random
 from kubernetes import config, client
 from kubernetes.stream import stream
+from flask import Flask
+
+app = Flask(__name__)
 
 flag_chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_'
 
@@ -26,3 +29,10 @@ def pod_executor(command, pod_name, pod_namespace):
                   stderr=True, stdin=False,
                   stdout=True, tty=False)
     return resp
+
+@app.route('/')
+def hello():
+    return "Hello, world!"
+
+if __name__ == '__main__':
+    app.run()
