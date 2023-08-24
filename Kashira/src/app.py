@@ -68,20 +68,24 @@ def run_watch_statefulset():
 
 
 def pod_executor(file_path, pod_name, pod_namespace):
-    with open(file_path, 'r') as file:
-        command = file.read()
-    resp = api.read_namespaced_pod(name=pod_name, namespace=pod_namespace)
-    exec_command = [
-        'sh',
-        '-c',
-        command]
-    resp = stream(api.connect_get_namespaced_pod_exec,
-                  pod_name,
-                  pod_namespace,
-                  command=exec_command,
-                  stderr=True, stdin=False,
-                  stdout=True, tty=False)
-    return resp
+    pod2_list = api.list_namespaced_pod(namespace=pod_namespace, label_selector=pod_name)
+    exec_command = ["sh",file_path]
+    if pod2_list.items:
+        pod2 = pod2_list.items[0]
+        pod2_name = pod2.metadata.name
+        try:
+            resp = api.connect_get_namespaced_pod_exec(
+                name=pod2_name,
+                namespace=pod_namespace,
+                command=exec_command,
+                stderr=True, stdin=False,
+                stdout=True, tty=False
+            )
+            print("Command executed. Response: " + resp)
+        except:
+            print("Error executing command")
+    else:
+        print("No pod found with label selector in team namespace.")
 
 def update_all_challenges():
     mongo_db = mongo['katana']
@@ -92,8 +96,7 @@ def update_all_challenges():
             challenge_name = challenge['challengename']
             checker_path = f"updaters/{challenge_name}/flag_updater.sh"
             if os.path.exists(checker_path):
-                command = ["sh", checker_path]
-                flag = pod_executor(command, team['podname'], team["username"]+"-ns")
+                flag = pod_executor(checker_path, team['podname'], team["username"]+"-ns")
                 print(flag)
 
 def flag_checker():
