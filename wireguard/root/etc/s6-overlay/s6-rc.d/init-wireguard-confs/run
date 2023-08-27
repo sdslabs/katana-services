@@ -20,6 +20,12 @@ fi
 
 generate_confs () {
     mkdir -p /config/server
+
+    # Prepare firewall_rules
+    if [[ ! -f /config/server/firewall.conf ]]; then
+      cp /defaults/firewall.conf /config/server/firewall.conf
+    fi
+
     if [[ ! -f /config/server/privatekey-server ]]; then
         umask 077
         wg genkey | tee /config/server/privatekey-server | wg pubkey > /config/server/publickey-server
