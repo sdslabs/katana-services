@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask,request
 from kubernetes import config, client, watch
 from kubernetes.stream import stream
 from pymongo import MongoClient
@@ -6,8 +6,13 @@ import random
 import threading
 import os
 import time
+import logging
 
 app = Flask(__name__)
+logging.basicConfig(filename="newfile.log", format='%(asctime)s %(message)s',filemode='w')
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
 flag_chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_'
 
 config.load_incluster_config()
@@ -121,9 +126,22 @@ def run_commands_randomly():
         flag_checker()
         time.sleep(random.randint(0, 600))
 
+@app.route('/receive-flag',methods=['POST'])
+def receive_flag():
+    logger.info("before if condition")
+    if request.method == 'POST':
+
+        data = request.get_json()
+
+        logger.info('Data Received: "{data}"'.format(data=data))
+        return "Request Processed.\n"
+    return "Flag received"
+
 if __name__ == '__main__':
     t1 = threading.Thread(target=run_watch_statefulset)
     t2 = threading.Thread(target=run_commands_randomly)
     t1.start()
     t2.start()
-    app.run()
+    logger.info("Hello inside __name__")
+    app.run(host='0.0.0.0',port = 80)
+
