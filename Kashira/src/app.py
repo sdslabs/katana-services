@@ -1,4 +1,4 @@
-from flask import Flask,request
+from flask import Flask, request
 from kubernetes import config, client, watch
 from kubernetes.stream import stream
 from pymongo import MongoClient
@@ -134,7 +134,6 @@ def receive_flag():
         team_name = data.get("team_name")
         challenge_name = data.get("challenge_name")
        
-
         mongo_db = mongo["katana"]
         mongo_collection = mongo_db['teams']
         team = mongo_collection.find_one({"username": team_name})
@@ -158,7 +157,6 @@ def receive_flag():
        
         teams = mongo_collection.find()
     
-
         for team in teams:
             for challenge in team["challenges"]:
                 if challenge["ChallengeName"] == challenge_name:
@@ -168,8 +166,10 @@ def receive_flag():
                             return "Can not submit your own flag"
                         else:
                             mongo_collection.update_one({"username": team_name}, {"$inc": {"score": challenge["points"]}})
-                            return "Points increased"
-    return "Wrong Flag or challenge name.\n"
+                            return "Flag submitted successfully\n"
+        return "Wrong flag or challenge name.\n"
+    else:
+        return "Wrong request method"
 
 if __name__ == '__main__':
     t1 = threading.Thread(target=run_watch_statefulset)

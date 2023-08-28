@@ -8,12 +8,9 @@ source /etc/profile
 team_name=$USERNAME
 challenge_name=$1
 flag=$2
-namespace="katana"
-service_name="kashira-svc"
-url="http://$service_name.$namespace.svc.cluster.local/receive-flag"
+url="http://kashira-svc.katana.svc.cluster.local/receive-flag"
 hashed_password=$(echo -n "${PASSWORD}" | openssl dgst -sha256 -hex| awk '{print $2}')
 encrypted_flag=$(echo -n "$flag" | openssl aes-256-cbc -e -a -salt -pbkdf2 -iter 10000 -pass "pass:${hashed_password}")
-
 
 data="{\"challenge_name\": \"$challenge_name\", \"encrypted_flag\": \"$encrypted_flag\",\"team_name\": \"$team_name\"}"
 
@@ -22,5 +19,5 @@ response=$(curl -s -X POST -H "Content-Type: application/json" -d "$data" $url)
 if [ $? -eq 0 ]; then
     echo "$response"
 else
-    echo "POST request failed"
+    echo "Flag submission failed"
 fi
