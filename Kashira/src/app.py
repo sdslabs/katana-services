@@ -159,7 +159,7 @@ def receive_flag():
     
         for team in teams:
             for challenge in team["challenges"]:
-                if challenge["ChallengeName"] == challenge_name:
+                if challenge["challengename"] == challenge_name:
                     true_flag = challenge["flag"]
                     if true_flag == flag:
                         if team["username"] == team_name :
