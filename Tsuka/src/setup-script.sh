@@ -7,8 +7,10 @@ DEBIAN_FRONTEND=noninteractive apt -y install openssh-server
 echo 'PermitRootLogin yes' >> /etc/ssh/sshd_config
 service ssh start
 mv /opt/katana/patch-challenge.sh /usr/bin/patch-challenge
+mv /opt/katana/flag-submit.sh /usr/bin/flag-submit
 mv /opt/katana/setup.sh /usr/bin/setup
 chmod +x /usr/bin/patch-challenge
+chmod +x /usr/bin/flag-submit
 chmod +x /usr/bin/setup
 git config --global user.email $HOSTNAME@katana.com
 git config --global user.name $HOSTNAME
