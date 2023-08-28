@@ -6,12 +6,12 @@ import random
 import threading
 import os
 import time
-import logging
+import binascii
+import base64
+import hashlib
+from Crypto.Cipher import AES    
 
 app = Flask(__name__)
-logging.basicConfig(filename="newfile.log", format='%(asctime)s %(message)s',filemode='w')
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
 
 flag_chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_'
 
@@ -20,7 +20,7 @@ api = client.CoreV1Api()
 api_instance = client.AppsV1Api()
 
 def establish_mongo_connection(username, password):
-    service_name = "mongo-nodeport-svc"
+    service_name = "mongo-svc"
     namespace = "katana"
     service = api.read_namespaced_service(name=service_name, namespace=namespace)
     mongo_ip = service.spec.cluster_ip
@@ -128,20 +128,53 @@ def run_commands_randomly():
 
 @app.route('/receive-flag',methods=['POST'])
 def receive_flag():
-    logger.info("before if condition")
     if request.method == 'POST':
-
         data = request.get_json()
+        encrypted_flag = data.get("encrypted_flag")
+        team_name = data.get("team_name")
+        challenge_name = data.get("challenge_name")
+       
 
-        logger.info('Data Received: "{data}"'.format(data=data))
-        return "Request Processed.\n"
-    return "Flag received"
+        mongo_db = mongo["katana"]
+        mongo_collection = mongo_db['teams']
+        team = mongo_collection.find_one({"username": team_name})
+    
+        if team:
+            password = team["password"]
+        else:
+            return "Team not found"
+        
+        iterations = 10000
+        outputbytes = base64.b64decode(encrypted_flag)
+        passwordbytes = password.encode('utf-8')
+        salt = outputbytes[8:16]
+        derivedkey = hashlib.pbkdf2_hmac('sha256', passwordbytes, salt, iterations, 48)
+        key = derivedkey[0:32]
+        iv = derivedkey[32:48]
+        ciphertext = outputbytes[16:]
+        decryptor = AES.new(key, AES.MODE_CBC, iv)
+        flag = decryptor.decrypt(ciphertext)
+        flag = flag[:-flag[-1]].decode('utf-8')
+       
+        teams = mongo_collection.find()
+    
+
+        for team in teams:
+            for challenge in team["challenges"]:
+                if challenge["ChallengeName"] == challenge_name:
+                    true_flag = challenge["flag"]
+                    if true_flag == flag:
+                        if team["username"] == team_name :
+                            return "Can not submit your own flag"
+                        else:
+                            mongo_collection.update_one({"username": team_name}, {"$inc": {"score": challenge["points"]}})
+                            return "Points increased"
+    return "Wrong Flag or challenge name.\n"
 
 if __name__ == '__main__':
     t1 = threading.Thread(target=run_watch_statefulset)
     t2 = threading.Thread(target=run_commands_randomly)
     t1.start()
     t2.start()
-    logger.info("Hello inside __name__")
     app.run(host='0.0.0.0',port = 80)
 
