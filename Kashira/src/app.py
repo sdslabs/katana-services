@@ -75,39 +75,35 @@ def run_watch_statefulset():
         watch_statefulset()
 
 
-def pod_executor(file_path, pod_name, pod_namespace):
+def pod_executor(file_path, real_flag, pod_name, pod_namespace, is_getter):
     api_new = client.CoreV1Api()
+    
+    _ = api_new.read_namespaced_pod(name=pod_name, namespace=pod_namespace)
+    resp = stream(api_new.connect_get_namespaced_pod_exec,
+                    pod_name, pod_namespace,
+                    command='/bin/sh',
+                    stderr = True, stdin = True , stdout = True, tty = False,
+                    _preload_content = False)
+    commands = ''
+    with open(file_path, 'r') as file:
+        commands = file.read()
     try:
-        _ = api_new.read_namespaced_pod(name=pod_name, namespace=pod_namespace) #error will occur here if pod does not exist
-        try:
-            resp = stream(api_new.connect_get_namespaced_pod_exec,
-                          pod_name, pod_namespace,
-                          command='/bin/sh',
-                          stderr = True, stdin = True , stdout = True, tty = False,
-                          _preload_content = False)
-            commands = ''
-            with open(file_path, 'r') as file:
-                commands = file.read()
-            resp.write_stdin(commands)
-            while True:
-                if resp.peek_stdout() != '':
-                   break
-            output = resp.read_stdout()
-            resp.close()
-            if 'flag_getter.sh' in file_path:
-                global status_getter
-                if not pod_namespace in status_getter:
-                    status_getter[pod_namespace] = {}
-                status_getter[pod_namespace][pod_name] = output
-            else:
-                global status_setter
-                if not pod_namespace in status_setter:
-                    status_setter[pod_namespace] = {}
-                status_setter[pod_namespace][pod_name] = output
-        except:
-            print("Error executing command")
+        resp.write_stdin(commands)
+        while True:
+            if resp.peek_stdout() != '':
+                break
+        output = resp.read_stdout()
+        resp.close()
+        if is_getter:
+            return output
+        else:
+            global status_setter
+            if not pod_namespace in status_setter:
+                status_setter[pod_namespace] = {}
+            status_setter[pod_namespace][pod_name] = output
+            return None
     except:
-        print("Error Occured")
+        return None
 
 def get_exact_name(challenge_name, namespace):
     api = client.CoreV1Api()
@@ -126,7 +122,7 @@ def exec_setter_script(team):
         setter_path = f"./flag-data/{challenge_name}/flag_setter.sh"
         if os.path.exists(setter_path):
             pod_name = get_exact_name(challenge_name, team_namespace)
-            pod_executor(setter_path, pod_name, team_namespace)
+            pod_executor(setter_path, pod_name, team_namespace, False)
             
 
 def update_all_challenges():
@@ -144,7 +140,12 @@ def exec_getter_script(team):
         getter_path = f"./flag-data/{challenge_name}/flag_getter.sh"
         if os.path.exists(getter_path):
             pod_name = get_exact_name(challenge_name, team_namespace)
-            pod_executor(getter_path, pod_name, team_namespace)
+            output = pod_executor(getter_path, pod_name, team_namespace, True)
+            global status_getter
+            if output == challenge['flag']:
+                status_getter[team_namespace][pod_name] = True
+            else:
+                status_getter[team_namespace][pod_name] = False
 
 def flag_checker():
     mongo_db = mongo['katana']
