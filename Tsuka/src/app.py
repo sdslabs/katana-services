@@ -47,20 +47,25 @@ class EventHandler(pyinotify.ProcessEvent):
                 subprocess.run(cmd)
         else:
             print("Challenge name does not match specified format: ",filepath)
+
         
 def start_notifier():
     wm = pyinotify.WatchManager()
     mask = pyinotify.IN_MODIFY
     handler = EventHandler()
     notifier = pyinotify.Notifier(wm, handler)
-    wdd = wm.add_watch(os.environ["ROOT_DIRECTORY"]+"/", mask, rec=False)
+    wdd = wm.add_watch("/opt/katana/", mask, rec=False)
     notifier.loop()
 
 # TODO: add metrics/monitoring functionality
 if __name__ == "__main__":
-    os.chmod("setup_script.sh", 0o755)
-    os.system("bash ./setup_script.sh")
-    os.system("rm -rf setup_script.sh")
+    os.chmod("setup-script.sh", 0o755)
+    os.system("bash ./setup-script.sh")
+    os.system("rm -rf setup-script.sh")
+    os.system("rm -rf /opt/katana/app.py")
+    ssh_password = os.environ.get('SSH_PASSWORD')
+    command = 'echo "root:{}" | chpasswd'.format(ssh_password)    
+    os.system(command)
     t = threading.Thread(target=start_notifier)
     t.start()
     app.run('0.0.0.0', os.environ['DAEMON_PORT'])    
