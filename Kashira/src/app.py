@@ -31,6 +31,9 @@ def establish_mongo_connection(username, password):
 
 mongo = establish_mongo_connection("adminuser","password123")
 
+status_getter = {}
+status_setter = {}
+
 def generate_flag():
     length_of_flag = random.randint(15, 20)
     flag = 'katana{' + ''.join(random.choice(flag_chars) for _ in range(length_of_flag)) + '}'
@@ -72,54 +75,85 @@ def run_watch_statefulset():
         watch_statefulset()
 
 
-def pod_executor(file_path, pod_name, pod_namespace):
-    pod2_list = api.list_namespaced_pod(namespace=pod_namespace, label_selector=pod_name)
-    exec_command = ["sh",file_path]
-    if pod2_list.items:
-        pod2 = pod2_list.items[0]
-        pod2_name = pod2.metadata.name
-        try:
-            resp = api.connect_get_namespaced_pod_exec(
-                name=pod2_name,
-                namespace=pod_namespace,
-                command=exec_command,
-                stderr=True, stdin=False,
-                stdout=True, tty=False
-            )
-            print("Command executed. Response: " + resp)
-        except:
-            print("Error executing command")
+def pod_executor(file_path, real_flag, pod_name, pod_namespace, is_getter):
+    api_new = client.CoreV1Api()
+    
+    _ = api_new.read_namespaced_pod(name=pod_name, namespace=pod_namespace)
+    resp = stream(api_new.connect_get_namespaced_pod_exec,
+                    pod_name, pod_namespace,
+                    command='/bin/sh',
+                    stderr = True, stdin = True , stdout = True, tty = False,
+                    _preload_content = False)
+    commands = ''
+    with open(file_path, 'r') as file:
+        commands = file.read()
+    try:
+        resp.write_stdin(commands)
+        while True:
+            if resp.peek_stdout() != '':
+                break
+        output = resp.read_stdout()
+        resp.close()
+        if is_getter:
+            return output
+        else:
+            global status_setter
+            if not pod_namespace in status_setter:
+                status_setter[pod_namespace] = {}
+            status_setter[pod_namespace][pod_name] = output
+            return None
+    except:
+        return None
+
+def get_exact_name(challenge_name, namespace):
+    api = client.CoreV1Api()
+    data_json = api.list_namespaced_pod(namespace, label_selector = 'app=' + challenge_name)
+    if len(data_json.items) == 0:
+        print(f'Error: No pod for challenge {challenge_name} exists in namespace: {namespace}')
+        return None
     else:
-        print("No pod found with label selector in team namespace.")
+        return data_json.items[0].metadata.name
+
+def exec_setter_script(team):
+    team_namespace = team['username'] + '-ns'
+    for challenge in team['challenges']:
+        challenge_name = challenge['challengename']
+        update_flag(mongo, team['username'], challenge_name)
+        setter_path = f"./flag-data/{challenge_name}/flag_setter.sh"
+        if os.path.exists(setter_path):
+            pod_name = get_exact_name(challenge_name, team_namespace)
+            pod_executor(setter_path, pod_name, team_namespace, False)
+            
 
 def update_all_challenges():
     mongo_db = mongo['katana']
     mongo_collection = mongo_db['teams']
     for team in mongo_collection.find():
-        for challenge in team['challenges']:
-            update_flag(mongo, team['username'], challenge['challengename'])
-            challenge_name = challenge['challengename']
-            checker_path = f"updaters/{challenge_name}/flag_updater.sh"
-            if os.path.exists(checker_path):
-                flag = pod_executor(checker_path, team['podname'], team["username"]+"-ns")
-                print(flag)
+        thr = threading.Thread(target=exec_setter_script, args=(team, ))
+        thr.daemon = True
+        thr.start()
+
+def exec_getter_script(team):
+    team_namespace = team['username'] + '-ns'
+    for  challenge in team['challenges']:
+        challenge_name = challenge['challengename']
+        getter_path = f"./flag-data/{challenge_name}/flag_getter.sh"
+        if os.path.exists(getter_path):
+            pod_name = get_exact_name(challenge_name, team_namespace)
+            output = pod_executor(getter_path, pod_name, team_namespace, True)
+            global status_getter
+            if output == challenge['flag']:
+                status_getter[team_namespace][pod_name] = True
+            else:
+                status_getter[team_namespace][pod_name] = False
 
 def flag_checker():
     mongo_db = mongo['katana']
     mongo_collection = mongo_db['teams']
     for team in mongo_collection.find():
-        for challenge in team['challenges']:
-            challenge_name = challenge['challengename']
-            checker_path = f"checkers/{challenge_name}/checker.sh"
-            if os.path.exists(checker_path):
-                command = ["sh", checker_path]
-                flag = pod_executor(command, team['podname'], team["username"]+"-ns")
-                if(flag == challenge['flag']):
-                    print(flag)
-                    print("Flag is correct")
-                else:
-                    print(flag)
-                    print("Flag is incorrect")
+        thr = threading.Thread(target=exec_getter_script, args=(team, ))
+        thr.daemon = True
+        thr.start()
 
 def run_commands_randomly():
     while True:
@@ -177,4 +211,3 @@ if __name__ == '__main__':
     t1.start()
     t2.start()
     app.run(host='0.0.0.0',port = 80)
-
