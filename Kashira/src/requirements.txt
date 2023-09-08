@@ -1,2 +1,7 @@
 kubernetes
 Flask
+flask
+pytest
+requests
+pyinotify
+thread6
