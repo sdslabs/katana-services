@@ -3,7 +3,7 @@ source /etc/profile
 if [ ! -d "/opt/katana/challenge/${2}" ]; then
     mkdir "/opt/katana/challenge/${2}"
 fi
-tar -zxf "/opt/katana/katana_${2}_${1}.tar.gz" -C /opt/katana/challenge/${2}
+tar -xf "/opt/katana/katana_${2}_${1}.tar.gz" -C /opt/katana/challenge/${2}
 rm -rf "/opt/katana/katana_${2}_${1}.tar.gz"
 cd "/opt/katana/challenge/${2}/${1}"
 if [ ! -d "/opt/katana/challenge/${2}/${1}/.git" ]; then
