@@ -16,7 +16,6 @@ git checkout master
 git add .
 git commit -m "${1} challenge of $USERNAME" 
 git push -u origin master -f
-
 curl -H "Content-Type: application/json" -X POST -d '{ "type": "gogs", "config": { "url": "'"$BACKEND_URL"'","content_type": "json"},"events": ["push"],"active": true}' "http://$GOGS/api/v1/repos/$USERNAME/${1}/hooks?token=$PASSWORD"
 curl -X PUT -H "Authorization: token $PASSWORD" -H "Content-Type: application/json" -d '{"permission": "admin"}' http://$GOGS/api/v1/repos/$USERNAME/${1}/collaborators/$ADMIN
 fi

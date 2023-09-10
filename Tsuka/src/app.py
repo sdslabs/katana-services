@@ -47,7 +47,6 @@ class EventHandler(pyinotify.ProcessEvent):
                 subprocess.run(cmd)
         else:
             print("Challenge name does not match specified format: ",filepath)
-
         
 def start_notifier():
     wm = pyinotify.WatchManager()
@@ -57,7 +56,7 @@ def start_notifier():
     wdd = wm.add_watch("/opt/katana/", mask, rec=False)
     notifier.loop()
 
-# TODO: add metrics/monitoring functionality
+# TODO: Add metrics/monitoring functionality
 if __name__ == "__main__":
     os.chmod("setup-script.sh", 0o755)
     os.system("bash ./setup-script.sh")
