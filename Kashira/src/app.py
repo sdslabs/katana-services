@@ -19,6 +19,8 @@ config.load_incluster_config()
 api = client.CoreV1Api()
 api_instance = client.AppsV1Api()
 
+submissions = {}
+
 def establish_mongo_connection(username, password):
     service_name = "mongo-svc"
     namespace = "katana"
@@ -55,6 +57,10 @@ def update_flag(mongo_client, team_name, challenge_name):
         }
     }
     mongo_collection.update_one(query, update)
+    
+def reset_submissions():
+    global submissions
+    submissions.clear()
 
 def watch_statefulset():
     namespace = 'katana'
@@ -65,6 +71,7 @@ def watch_statefulset():
             annotations = event['object'].metadata.annotations
             if annotations and annotations.get('tick') == 'true':
                 update_all_challenges()
+                reset_submissions()
                 annotations['tick'] = 'false'  # Set annotation to 'false'
                 statefulset = api_instance.read_namespaced_stateful_set(statefulset_name, namespace)
                 statefulset.metadata.annotations = annotations
@@ -199,8 +206,20 @@ def receive_flag():
                         if team["username"] == team_name :
                             return "Can not submit your own flag"
                         else:
-                            mongo_collection.update_one({"username": team_name}, {"$inc": {"score": challenge["points"]}})
-                            return "Flag submitted successfully\n"
+                            submitter_team = team["username"]
+                            global submissions
+                            if submitter_team in submissions:
+                                if (team_name, challenge_name) in submissions[submitter_team]:
+                                    return "Please wait for the next tick before submitting the same team and challenge flag\n"
+                                else:
+                                    mongo_collection.update_one({"username": team_name}, {"$inc": {"score": challenge["points"]}})
+                                    submissions[submitter_team].add((team_name, challenge_name))
+                                    return "Flag submitted successfully\n"
+                            else:
+                                mongo_collection.update_one({"username": team_name}, {"$inc": {"score": challenge["points"]}})
+                                submissions[submitter_team] = set()
+                                submissions.add((team_name, challenge_name))
+                                return "Flag submitted successfully\n"
         return "Wrong flag or challenge name.\n"
     else:
         return "Wrong request method"
