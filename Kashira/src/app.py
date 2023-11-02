@@ -9,7 +9,8 @@ import time
 import binascii
 import base64
 import hashlib
-from Crypto.Cipher import AES    
+from Crypto.Cipher import AES
+import json
 
 app = Flask(__name__)
 
@@ -18,6 +19,9 @@ flag_chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_'
 config.load_incluster_config()
 api = client.CoreV1Api()
 api_instance = client.AppsV1Api()
+
+submissions = {}
+tick_count = 0
 
 def establish_mongo_connection(username, password):
     service_name = "mongo-svc"
@@ -55,6 +59,26 @@ def update_flag(mongo_client, team_name, challenge_name):
         }
     }
     mongo_collection.update_one(query, update)
+    
+def reset_submissions():
+    global submissions
+    submissions.clear()
+    
+def record_scores():
+    mongo_db = mongo['katana']
+    mongo_collection = mongo_db['teams']
+    data = mongo_collection.find()
+    temp = []
+    for i in data:
+        del i['_id']
+        del i['podname']
+        del i['password']
+        del i['publicKey']
+        temp.append(i)
+    final_json = {}
+    final_json['teams'] = temp
+    with open(f'./scores/scores-tick-{tick_count}.json', 'w') as json_file:
+        json.dump(final_json, json_file, indent=3)
 
 def watch_statefulset():
     namespace = 'katana'
@@ -64,7 +88,10 @@ def watch_statefulset():
         if event['object'].metadata.name == statefulset_name:
             annotations = event['object'].metadata.annotations
             if annotations and annotations.get('tick') == 'true':
+                tick_count += 1
                 update_all_challenges()
+                reset_submissions()
+                record_scores()
                 annotations['tick'] = 'false'  # Set annotation to 'false'
                 statefulset = api_instance.read_namespaced_stateful_set(statefulset_name, namespace)
                 statefulset.metadata.annotations = annotations
@@ -159,6 +186,27 @@ def run_commands_randomly():
     while True:
         flag_checker()
         time.sleep(random.randint(0, 600))
+        
+def successful_submission(submitter_team, submitted_team, mongo_collection, challenge):
+    global submissions
+    mongo_collection.update_one({"username": submitter_team}, {"$inc": {"score": challenge["points"]}})
+    submissions[submitter_team].add((submitted_team, challenge["challengename"]))
+    at_res = mongo_collection.find_one({"username": submitter_team})
+    pos = -1
+    for i in range(len(at_res['challenges'])):
+        if at_res['challenges'][i]['challengename'] == challenge['challengename']:
+            pos = i
+            break
+    attack_query = {'$inc': {f'challenges.{pos}.attacks': 1 }}
+    mongo_collection.update_one({'username': submitted_team}, attack_query)
+    def_res = mongo_collection.find_one({"username": submitted_team})
+    pos = -1
+    for i in range(len(def_res['challenges'])):
+        if at_res['challenges'][i] == challenge['challengename']:
+            pos = i
+            break
+    defense_query = {'$inc': {f'challenges.{pos}.defences': -1 }}
+    mongo_collection.update_one({'username': submitted_team}, defense_query)
 
 @app.route('/receive-flag',methods=['POST'])
 def receive_flag():
@@ -199,13 +247,26 @@ def receive_flag():
                         if team["username"] == team_name :
                             return "Can not submit your own flag"
                         else:
-                            mongo_collection.update_one({"username": team_name}, {"$inc": {"score": challenge["points"]}})
-                            return "Flag submitted successfully\n"
+                            submitted_team = team["username"]
+                            global submissions
+                            if team_name in submissions:
+                                if (submitted_team, challenge_name) in submissions[team_name]:
+                                    return "Please wait for the next tick before submitting the same team and challenge flag\n"
+                                else:
+                                    successful_submission(team_name, team["username"], teams, mongo_collection, challenge)
+                                    return "Flag submitted successfully\n"
+                            else:
+                                submissions[team_name] = set()
+                                successful_submission(team_name, team["username"], teams, mongo_collection, challenge)
+                                return "Flag submitted successfully\n"
         return "Wrong flag or challenge name.\n"
     else:
         return "Wrong request method"
 
 if __name__ == '__main__':
+    directory_name = 'scores'
+    if not os.path.exists(directory_name):
+        os.makedirs(directory_name)
     t1 = threading.Thread(target=run_watch_statefulset)
     t2 = threading.Thread(target=run_commands_randomly)
     t1.start()
