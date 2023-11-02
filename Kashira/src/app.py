@@ -9,7 +9,8 @@ import time
 import binascii
 import base64
 import hashlib
-from Crypto.Cipher import AES    
+from Crypto.Cipher import AES
+import json
 
 app = Flask(__name__)
 
@@ -20,6 +21,7 @@ api = client.CoreV1Api()
 api_instance = client.AppsV1Api()
 
 submissions = {}
+tick_count = 0
 
 def establish_mongo_connection(username, password):
     service_name = "mongo-svc"
@@ -61,6 +63,22 @@ def update_flag(mongo_client, team_name, challenge_name):
 def reset_submissions():
     global submissions
     submissions.clear()
+    
+def record_scores():
+    mongo_db = mongo['katana']
+    mongo_collection = mongo_db['teams']
+    data = mongo_collection.find()
+    temp = []
+    for i in data:
+        del i['_id']
+        del i['podname']
+        del i['password']
+        del i['publicKey']
+        temp.append(i)
+    final_json = {}
+    final_json['teams'] = temp
+    with open(f'./scores/scores-tick-{tick_count}.json', 'w') as json_file:
+        json.dump(final_json, json_file, indent=3)
 
 def watch_statefulset():
     namespace = 'katana'
@@ -70,8 +88,10 @@ def watch_statefulset():
         if event['object'].metadata.name == statefulset_name:
             annotations = event['object'].metadata.annotations
             if annotations and annotations.get('tick') == 'true':
+                tick_count += 1
                 update_all_challenges()
                 reset_submissions()
+                record_scores()
                 annotations['tick'] = 'false'  # Set annotation to 'false'
                 statefulset = api_instance.read_namespaced_stateful_set(statefulset_name, namespace)
                 statefulset.metadata.annotations = annotations
@@ -244,6 +264,9 @@ def receive_flag():
         return "Wrong request method"
 
 if __name__ == '__main__':
+    directory_name = 'scores'
+    if not os.path.exists(directory_name):
+        os.makedirs(directory_name)
     t1 = threading.Thread(target=run_watch_statefulset)
     t2 = threading.Thread(target=run_commands_randomly)
     t1.start()
