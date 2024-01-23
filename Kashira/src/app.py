@@ -36,6 +36,9 @@ mongo = establish_mongo_connection("adminuser","password123")
 status_getter = {}
 status_setter = {}
 
+challenge_statuses = {}
+down_deduction = 10
+
 def generate_flag():
     length_of_flag = random.randint(15, 20)
     flag = 'katana{' + ''.join(random.choice(flag_chars) for _ in range(length_of_flag)) + '}'
@@ -61,10 +64,31 @@ def update_flag(mongo_client, team_name, challenge_name):
 def reset_submissions():
     global submissions
     submissions.clear()
+    
+def deduct_downtime_scores(mongo_client):
+    global challenge_statuses
+    for team in challenge_statuses:
+        for challenge in challenge_statuses[team]:
+            query = {
+                'username': team,
+                'challenges.challengename': challenge
+            }
+            
+            update = {
+                '$inc': {
+                    'score': -((1 - challenge_statuses[team][challenge]) * down_deduction)
+                }
+            }
+            mongo_db = mongo_client['katana']
+            mongo_collection = mongo_db['teams']
+            mongo_collection.update_one(query, update)
+    challenge_statuses = {}
+            
 
 def watch_statefulset():
     namespace = 'katana'
     statefulset_name = 'kashira'
+    global mongo
     w = watch.Watch()
     for event in w.stream(api_instance.list_namespaced_stateful_set, namespace=namespace):
         if event['object'].metadata.name == statefulset_name:
@@ -72,6 +96,7 @@ def watch_statefulset():
             if annotations and annotations.get('tick') == 'true':
                 update_all_challenges()
                 reset_submissions()
+                deduct_downtime_scores(mongo)
                 annotations['tick'] = 'false'  # Set annotation to 'false'
                 statefulset = api_instance.read_namespaced_stateful_set(statefulset_name, namespace)
                 statefulset.metadata.annotations = annotations
@@ -242,10 +267,24 @@ def receive_flag():
         return "Wrong flag or challenge name.\n"
     else:
         return "Wrong request method"
-
+    
+@app.route('/kissaki', methods=['POST'])
+def receive_json():
+    global challenge_statuses
+    content = request.json
+    challenge_name = content['challengeName']
+    for data in content['data']:
+        if not data['teamName'] in challenge_statuses:
+            challenge_statuses[data['teamName']] = {}
+        if not challenge_name in challenge_statuses[data['teamName']]:
+            challenge_statuses[data['teamName']][challenge_name] = 1
+        challenge_statuses[data['teamName']][challenge_name] &= data['status']
+    return 'OK', 200
+        
+    
 if __name__ == '__main__':
     t1 = threading.Thread(target=run_watch_statefulset)
     t2 = threading.Thread(target=run_commands_randomly)
     t1.start()
     t2.start()
-    app.run(host='0.0.0.0',port = 80)
+    app.run(host='0.0.0.0',port = 5000)
