@@ -212,6 +212,16 @@ def successful_submission(submitter_team, submitted_team, mongo_collection, chal
             break
     defense_query = {'$inc': {f'challenges.{pos}.defences': -1 }}
     mongo_collection.update_one({'username': submitted_team}, defense_query)
+    
+def parse_json(content):
+    global challenge_statuses
+    challenge_name = content['challengeName']
+    for data in content['data']:
+        if not data['teamName'] in challenge_statuses:
+            challenge_statuses[data['teamName']] = {}
+        if not challenge_name in challenge_statuses[data['teamName']]:
+            challenge_statuses[data['teamName']][challenge_name] = 1
+        challenge_statuses[data['teamName']][challenge_name] &= data['status']
 
 @app.route('/receive-flag',methods=['POST'])
 def receive_flag():
@@ -270,17 +280,9 @@ def receive_flag():
     
 @app.route('/kissaki', methods=['POST'])
 def receive_json():
-    global challenge_statuses
-    content = request.json
-    challenge_name = content['challengeName']
-    for data in content['data']:
-        if not data['teamName'] in challenge_statuses:
-            challenge_statuses[data['teamName']] = {}
-        if not challenge_name in challenge_statuses[data['teamName']]:
-            challenge_statuses[data['teamName']][challenge_name] = 1
-        challenge_statuses[data['teamName']][challenge_name] &= data['status']
-    return 'OK', 200
-        
+    json = request.json
+    for info in json['data']:
+        parse_json(info)     
     
 if __name__ == '__main__':
     t1 = threading.Thread(target=run_watch_statefulset)
