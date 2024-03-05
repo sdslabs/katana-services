@@ -92,7 +92,7 @@ def run_loop():
 
             kashira_svc = "kashira-svc"
             kashira_ns = "katana"
-            kashira_port = "80"
+            kashira_port = service_port(kashira_svc, kashira_ns)
             url = f"http://{kashira_svc}.{kashira_ns}.svc.cluster.local:{kashira_port}/kissaki"
             headers = {"Content-Type": "application/json"}
             # url = "http://10.61.81.227:5000"
