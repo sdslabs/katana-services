@@ -322,13 +322,24 @@ def receive_flag():
         return "Wrong request method"
 
 
+# @app.route("/kissaki", methods=["POST"])
+# def receive_json():
+#     json = request.json
+#     for info in json["data"]:
+#         parse_json(info)
+#     return "OK", 200
+
+# ------------code for testing----------------
+import logging
+
+logging.basicConfig(level=logging.INFO)
+
 @app.route("/kissaki", methods=["POST"])
 def receive_json():
     json = request.json
-    for info in json["data"]:
-        parse_json(info)
-    return "OK", 200
-
+    logging.info(f"Received data:\n{json}")
+    return "ok", 200
+# ------------code for testing----------------
 
 if __name__ == "__main__":
     t1 = threading.Thread(target=run_watch_statefulset)
