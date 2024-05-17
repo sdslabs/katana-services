@@ -13,7 +13,34 @@ from Crypto.Cipher import AES
 
 app = Flask(__name__)
 
-flag_chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_'
+flag_chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+
+config.load_incluster_config()
+api = client.CoreV1Api()
+api_instance = client.AppsV1Api()
+
+submissions = {}
+
+
+def establish_mongo_connection(username, password):
+    service_name = "mongo-svc"
+    namespace = "katana"
+    service = api.read_namespaced_service(name=service_name, namespace=namespace)
+    mongo_ip = service.spec.cluster_ip
+    mongo_uri = f"mongodb://{username}:{password}@{mongo_ip}"
+    mongo_client = MongoClient(mongo_uri)
+    print("Connected to MongoDB.")
+    return mongo_client
+
+
+mongo = establish_mongo_connection("adminuser", "password123")
+
+status_getter = {}
+status_setter = {}
+
+challenge_statuses = {}
+down_deduction = 10
+
 
 config.load_incluster_config()
 api = client.CoreV1Api()
@@ -41,6 +68,7 @@ down_deduction = 10
 
 def generate_flag():
     length_of_flag = random.randint(15, 20)
+    
     flag = 'katana{' + ''.join(random.choice(flag_chars) for _ in range(length_of_flag)) + '}'
     return flag
 
@@ -136,7 +164,7 @@ def pod_executor(file_path, real_flag, pod_name, pod_namespace, is_getter):
             return None
     except:
         return None
-
+      
 def get_exact_name(challenge_name, namespace):
     api = client.CoreV1Api()
     data_json = api.list_namespaced_pod(namespace, label_selector = 'app=' + challenge_name)
@@ -155,7 +183,6 @@ def exec_setter_script(team):
         if os.path.exists(setter_path):
             pod_name = get_exact_name(challenge_name, team_namespace)
             pod_executor(setter_path, pod_name, team_namespace, False)
-            
 
 def update_all_challenges():
     mongo_db = mongo['katana']
@@ -229,8 +256,7 @@ def receive_flag():
         data = request.get_json()
         encrypted_flag = data.get("encrypted_flag")
         team_name = data.get("team_name")
-        challenge_name = data.get("challenge_name")
-       
+        challenge_name = data.get("challenge_name")       
         mongo_db = mongo["katana"]
         mongo_collection = mongo_db['teams']
         team = mongo_collection.find_one({"username": team_name})
@@ -277,7 +303,7 @@ def receive_flag():
         return "Wrong flag or challenge name.\n"
     else:
         return "Wrong request method"
-    
+      
 @app.route('/kissaki', methods=['POST'])
 def receive_json():
     json = request.json
