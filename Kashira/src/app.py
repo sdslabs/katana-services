@@ -10,6 +10,8 @@ import binascii
 import base64
 import hashlib
 from Crypto.Cipher import AES    
+import json
+import logging
 
 app = Flask(__name__)
 
@@ -58,14 +60,6 @@ def establish_mongo_connection(username, password):
     print("Connected to MongoDB.")
     return mongo_client
 
-mongo = establish_mongo_connection("adminuser","password123")
-
-status_getter = {}
-status_setter = {}
-
-challenge_statuses = {}
-down_deduction = 10
-
 def generate_flag():
     length_of_flag = random.randint(15, 20)
     
@@ -76,23 +70,23 @@ def update_flag(mongo_client, team_name, challenge_name):
     flag = generate_flag()  
     mongo_db = mongo_client['katana']
     mongo_collection = mongo_db['teams']
-    
+
     query = {
         'username': team_name,
         'challenges.challengename': challenge_name
     }
-    
+
     update = {
         '$set': {
             'challenges.$.flag': flag
         }
     }
     mongo_collection.update_one(query, update)
-    
+
 def reset_submissions():
     global submissions
     submissions.clear()
-    
+
 def deduct_downtime_scores(mongo_client):
     global challenge_statuses
     for team in challenge_statuses:
@@ -101,7 +95,7 @@ def deduct_downtime_scores(mongo_client):
                 'username': team,
                 'challenges.challengename': challenge
             }
-            
+
             update = {
                 '$inc': {
                     'score': -((1 - challenge_statuses[team][challenge]) * down_deduction)
@@ -111,7 +105,7 @@ def deduct_downtime_scores(mongo_client):
             mongo_collection = mongo_db['teams']
             mongo_collection.update_one(query, update)
     challenge_statuses = {}
-            
+
 
 def watch_statefulset():
     namespace = 'katana'
@@ -137,7 +131,7 @@ def run_watch_statefulset():
 
 def pod_executor(file_path, real_flag, pod_name, pod_namespace, is_getter):
     api_new = client.CoreV1Api()
-    
+
     _ = api_new.read_namespaced_pod(name=pod_name, namespace=pod_namespace)
     resp = stream(api_new.connect_get_namespaced_pod_exec,
                     pod_name, pod_namespace,
@@ -164,7 +158,7 @@ def pod_executor(file_path, real_flag, pod_name, pod_namespace, is_getter):
             return None
     except:
         return None
-      
+
 def get_exact_name(challenge_name, namespace):
     api = client.CoreV1Api()
     data_json = api.list_namespaced_pod(namespace, label_selector = 'app=' + challenge_name)
@@ -218,7 +212,7 @@ def run_commands_randomly():
     while True:
         flag_checker()
         time.sleep(random.randint(0, 600))
-        
+
 def successful_submission(submitter_team, submitted_team, mongo_collection, challenge):
     global submissions
     mongo_collection.update_one({"username": submitter_team}, {"$inc": {"score": challenge["points"]}})
@@ -239,16 +233,18 @@ def successful_submission(submitter_team, submitted_team, mongo_collection, chal
             break
     defense_query = {'$inc': {f'challenges.{pos}.defences': -1 }}
     mongo_collection.update_one({'username': submitted_team}, defense_query)
-    
+
 def parse_json(content):
     global challenge_statuses
     challenge_name = content['challengeName']
-    for data in content['data']:
-        if not data['teamName'] in challenge_statuses:
-            challenge_statuses[data['teamName']] = {}
-        if not challenge_name in challenge_statuses[data['teamName']]:
-            challenge_statuses[data['teamName']][challenge_name] = 1
-        challenge_statuses[data['teamName']][challenge_name] &= data['status']
+    for team in content["data"]:
+        if not team["teamName"] in challenge_statuses:
+            challenge_statuses[team["teamName"]] = {}
+        if not challenge_name in challenge_statuses[team["teamName"]]:
+            challenge_statuses[team["teamName"]][challenge_name] = 1
+        challenge_statuses[team["teamName"]][challenge_name] &= team[
+            "status"
+        ]  # logic seems a bit fuzzy, why '&'
 
 @app.route('/receive-flag',methods=['POST'])
 def receive_flag():
@@ -260,12 +256,12 @@ def receive_flag():
         mongo_db = mongo["katana"]
         mongo_collection = mongo_db['teams']
         team = mongo_collection.find_one({"username": team_name})
-    
+
         if team:
             password = team["password"]
         else:
             return "Team not found"
-        
+
         iterations = 10000
         outputbytes = base64.b64decode(encrypted_flag)
         passwordbytes = password.encode('utf-8')
@@ -277,9 +273,9 @@ def receive_flag():
         decryptor = AES.new(key, AES.MODE_CBC, iv)
         flag = decryptor.decrypt(ciphertext)
         flag = flag[:-flag[-1]].decode('utf-8')
-       
+
         teams = mongo_collection.find()
-    
+
         for team in teams:
             for challenge in team["challenges"]:
                 if challenge["challengename"] == challenge_name:
@@ -303,16 +299,20 @@ def receive_flag():
         return "Wrong flag or challenge name.\n"
     else:
         return "Wrong request method"
-      
+
+logging.basicConfig(level=logging.INFO)
+
 @app.route('/kissaki', methods=['POST'])
 def receive_json():
-    json = request.json
-    for info in json['data']:
-        parse_json(info)     
-    
+    json_data = request.json  # a list of challenges
+    logging.info(f"Received data:\n{json_data}")  # remove this later iiteens
+    for challenge in json_data:
+        parse_json(challenge)
+    return "ok", 200  # add something to return otherwise error occur
+
 if __name__ == '__main__':
     t1 = threading.Thread(target=run_watch_statefulset)
     t2 = threading.Thread(target=run_commands_randomly)
     t1.start()
     t2.start()
-    app.run(host='0.0.0.0',port = 5000)
+    app.run(host="0.0.0.0", port=80)
