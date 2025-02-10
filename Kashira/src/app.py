@@ -50,16 +50,6 @@ api_instance = client.AppsV1Api()
 
 submissions = {}
 
-def establish_mongo_connection(username, password):
-    service_name = "mongo-svc"
-    namespace = "katana"
-    service = api.read_namespaced_service(name=service_name, namespace=namespace)
-    mongo_ip = service.spec.cluster_ip
-    mongo_uri = f"mongodb://{username}:{password}@{mongo_ip}"
-    mongo_client = MongoClient(mongo_uri)
-    print("Connected to MongoDB.")
-    return mongo_client
-
 def generate_flag():
     length_of_flag = random.randint(15, 20)
     
