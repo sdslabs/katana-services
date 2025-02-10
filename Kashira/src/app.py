@@ -12,13 +12,13 @@ import hashlib
 from Crypto.Cipher import AES    
 import json
 import logging
-import tomli
+# import tomli
 
 # Read the TOML file
 # TODO: Use these toml variables in code
-config = None
-with open("config.toml", "rb") as f:
-    config = tomli.load(f)
+# config = None
+# with open("config.toml", "rb") as f:
+#     config = tomli.load(f)
 
 app = Flask(__name__)
 
@@ -345,6 +345,9 @@ def receive_flag():
 
 logging.basicConfig(level=logging.INFO)
 
+'''
+Kissaki sends requests whenever a down time is detected by it for a pod
+'''
 @app.route('/kissaki', methods=['POST'])
 def receive_json():
     json_data = request.json  # a list of challenges
