@@ -1,0 +1,7 @@
+[kubernetes]
+namespace-name = "katana"
+
+[mongo]
+service-name = "mongo-svc"
+username = "adminuser"
+password = "password123"
