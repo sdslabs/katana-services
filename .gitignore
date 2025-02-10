@@ -8,3 +8,5 @@ recursive-exclude * *.py[co]
 
 # Exclude the tests
 recursive-exclude tests *
+
+.idea/

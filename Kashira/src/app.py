@@ -12,6 +12,13 @@ import hashlib
 from Crypto.Cipher import AES    
 import json
 import logging
+# import tomli
+
+# Read the TOML file
+# TODO: Use these toml variables in code
+# config = None
+# with open("config.toml", "rb") as f:
+#     config = tomli.load(f)
 
 app = Flask(__name__)
 
@@ -50,22 +57,17 @@ api_instance = client.AppsV1Api()
 
 submissions = {}
 
-def establish_mongo_connection(username, password):
-    service_name = "mongo-svc"
-    namespace = "katana"
-    service = api.read_namespaced_service(name=service_name, namespace=namespace)
-    mongo_ip = service.spec.cluster_ip
-    mongo_uri = f"mongodb://{username}:{password}@{mongo_ip}"
-    mongo_client = MongoClient(mongo_uri)
-    print("Connected to MongoDB.")
-    return mongo_client
-
 def generate_flag():
     length_of_flag = random.randint(15, 20)
-    
+
+    # Flag template: katana{FLAG}
     flag = 'katana{' + ''.join(random.choice(flag_chars) for _ in range(length_of_flag)) + '}'
     return flag
 
+'''
+Updates flag for a given challenge of a given team
+Called when executing setter script to update flag same as newly set flag
+'''
 def update_flag(mongo_client, team_name, challenge_name):
     flag = generate_flag()  
     mongo_db = mongo_client['katana']
@@ -87,6 +89,11 @@ def reset_submissions():
     global submissions
     submissions.clear()
 
+'''
+For the duration a pod goes down, we deduct scores according to downtime
+This is to prevent teams from intentionally crashing their own pods to preserve their flag
+The challenge_statuses are checked regularly to record their statuses
+'''
 def deduct_downtime_scores(mongo_client):
     global challenge_statuses
     for team in challenge_statuses:
@@ -96,6 +103,7 @@ def deduct_downtime_scores(mongo_client):
                 'challenges.challengename': challenge
             }
 
+            # Basically if status is 1 (up) nothing happens. Else if status is 0 (down) score gets deducted
             update = {
                 '$inc': {
                     'score': -((1 - challenge_statuses[team][challenge]) * down_deduction)
@@ -106,7 +114,9 @@ def deduct_downtime_scores(mongo_client):
             mongo_collection.update_one(query, update)
     challenge_statuses = {}
 
-
+'''
+Runs at regular intervals
+'''
 def watch_statefulset():
     namespace = 'katana'
     statefulset_name = 'kashira'
@@ -128,7 +138,9 @@ def run_watch_statefulset():
     with app.app_context():
         watch_statefulset()
 
-
+'''
+Executes a file given its path inside the kashira (not challenge) pod and returns its output
+'''
 def pod_executor(file_path, real_flag, pod_name, pod_namespace, is_getter):
     api_new = client.CoreV1Api()
 
@@ -159,6 +171,11 @@ def pod_executor(file_path, real_flag, pod_name, pod_namespace, is_getter):
     except:
         return None
 
+'''
+Pods get assigned random names
+Hence we use labels to differentiate them
+This function returns the name of the pod given its labels
+'''
 def get_exact_name(challenge_name, namespace):
     api = client.CoreV1Api()
     data_json = api.list_namespaced_pod(namespace, label_selector = 'app=' + challenge_name)
@@ -168,6 +185,9 @@ def get_exact_name(challenge_name, namespace):
     else:
         return data_json.items[0].metadata.name
 
+'''
+Setter script randomly sets a new flag for a given challenge of a given team
+'''
 def exec_setter_script(team):
     team_namespace = team['username'] + '-ns'
     for challenge in team['challenges']:
@@ -178,6 +198,9 @@ def exec_setter_script(team):
             pod_name = get_exact_name(challenge_name, team_namespace)
             pod_executor(setter_path, pod_name, team_namespace, False)
 
+'''
+Executes setter script for each challenge on a separate thread
+'''
 def update_all_challenges():
     mongo_db = mongo['katana']
     mongo_collection = mongo_db['teams']
@@ -186,6 +209,12 @@ def update_all_challenges():
         thr.daemon = True
         thr.start()
 
+'''
+To prevent users from manually changing their own flag to something different than what we have store inside mongo and check against,
+we have a getter script; which fetches the flag and checks if it matches with that in DB. Unlike setter scripts which are executed periodically,
+getter scripts are executed randomly
+TODO: Currently we don't do anything regarding this. Maybe score deduction or disqualification?
+'''
 def exec_getter_script(team):
     team_namespace = team['username'] + '-ns'
     for  challenge in team['challenges']:
@@ -200,6 +229,9 @@ def exec_getter_script(team):
             else:
                 status_getter[team_namespace][pod_name] = False
 
+'''
+Multithreadedly executing getter scripts on each pod
+'''
 def flag_checker():
     mongo_db = mongo['katana']
     mongo_collection = mongo_db['teams']
@@ -208,11 +240,19 @@ def flag_checker():
         thr.daemon = True
         thr.start()
 
+'''
+As the name suggests, use when you want to execute something randomly
+Currently used to execute getter scripts
+'''
 def run_commands_randomly():
     while True:
         flag_checker()
         time.sleep(random.randint(0, 600))
 
+'''
+Successful attack and defense scores updates
+Called on successful submission or defense
+'''
 def successful_submission(submitter_team, submitted_team, mongo_collection, challenge):
     global submissions
     mongo_collection.update_one({"username": submitter_team}, {"$inc": {"score": challenge["points"]}})
@@ -246,6 +286,9 @@ def parse_json(content):
             "status"
         ]  # logic seems a bit fuzzy, why '&'
 
+'''
+Route to handle flag submissions
+'''
 @app.route('/receive-flag',methods=['POST'])
 def receive_flag():
     if request.method == 'POST':
@@ -302,6 +345,9 @@ def receive_flag():
 
 logging.basicConfig(level=logging.INFO)
 
+'''
+Kissaki sends requests whenever a down time is detected by it for a pod
+'''
 @app.route('/kissaki', methods=['POST'])
 def receive_json():
     json_data = request.json  # a list of challenges
